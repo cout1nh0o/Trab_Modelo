@@ -1,6 +1,7 @@
-## teste 
+sisam <- read_csv("task_9045.dados_sisam.2000.csv")
 
 
-### teste 2
 
-### final, funciona? 
+plot(sisam$temperatura_c, sisam$vento_velocidade_ms)
+
+# uma merda, sem regressao aqui 
