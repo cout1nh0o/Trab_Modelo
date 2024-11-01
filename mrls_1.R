@@ -1,4 +1,4 @@
-Alibrary(dplyr)
+library(dplyr)
 library(ggplot2)
 MARANHAO <- readxl::read_excel("MARANHAO.xlsx")
 
