@@ -27,7 +27,7 @@ ggplot(mar,
               color = "tomato",
               se = FALSE) +
   labs(x = "Temperatura",
-       y = "Umidade") +r
+       y = "Umidade") +
   theme_classic()
 
 
@@ -69,8 +69,9 @@ ICy_i_c[,2:3]
 ###### Teste de hipótese para B0
 tb0 <- b0chap/sqrt(sigma2chapeu * (1/length(x) + mean(x)^2/sxx))
 ### p-valor para B0
-p0 <- 2*pt(-abs(t0), df = summary(modelo)$df[1])
-
+#p0 <- 2*pt(-abs(tb0), df = summary(modelo)$df[1])
+p01 <- 2 * (1 - pt(abs(tb0), df=summary(modelo)$df[2]))
+p01<0.005
 t <- dt(0.975, 363)
 
 tb0 > t
@@ -79,15 +80,16 @@ tb0 > t
 ##### Teste de hipótese para B1
 t_b1 <- b1chap/sqrt(sigma2chapeu/sxx)
 ### p-valor para B1
-p1 <- 2*pt(-abs(t_b1), df = summary(modelo)$df[1])
-
+# p1 <- 2*pt(-abs(t_b1), df = summary(modelo)$df[1])
+p12 <- 2 * (1 - pt(abs(t_b1),df = summary(modelo)$df[2] ))
 t <- dt(0.975, 363)
 
 abs(t_b1) > t
 
-p1 > 0.005
-### PElo p-valor não rejeita h0, mas pela estatistica de teste rejeita h0, logo há evidencias para acreditar que b0 é diferente de 0 
-
+p12 < 0.005
+#Em geral vamos usar o pvalor deste teste para tomar a decis˜ao. Ent˜ao H0 ser´a rejeitada
+#se o p-valor do teste for pequeno e aceita caso contr´ario
+### Pelo p-valor rejeita h0, mas pela estatistica de teste rejeita h0, logo há evidencias para acreditar que b0 é diferente de 0 
 
 
 
