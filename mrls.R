@@ -1,5 +1,10 @@
-library(dplyr)
-library(ggplot2)
+library(tidyverse)
+library(patchwork)
+
+
+
+# === Passos prévios ====
+
 MARANHAO <- readxl::read_excel("MARANHAO.xlsx")
 
 mar <- MARANHAO  %>%
@@ -10,6 +15,8 @@ mar <- MARANHAO  %>%
   summarise(
     mean_temp = mean(temperatura_c, na.rm = TRUE),
     mean_umid = mean(umidade_relativa_percentual, na.rm = TRUE),
+    median_temp = median(temperatura_c, na.rm = TRUE),
+    median_umid = median(umidade_relativa_percentual, na.rm = TRUE),
     mean_pm2.5 = mean(pm25_ugm3, na.rm = TRUE),
     mean_co = mean(co_ppb, na.rm = TRUE),
     mean_no2 = mean(no2_ppb, na.rm = TRUE),
@@ -20,7 +27,44 @@ mar <- MARANHAO  %>%
 
 
 
-# Gráfico da temperatura por umidade
+# ==== Análise descritiva ====
+
+# Histograma baseado na densidade para mean_umid
+ggplot(mar, aes(x = mean_umid)) +
+  geom_histogram(aes(y = ..density..),
+                 binwidth = 1,
+                 fill = "cornflowerblue",
+                 color = "black",
+                 alpha = .6) +
+  labs(x = "Umidade", y = "Densidade") +
+  scale_x_continuous(limits = c(85, 100), 
+                     breaks = seq(85, 100, by = 5)) +
+  theme_minimal() -> h1
+
+# Histograma baseado na densidade para mean_temp
+ggplot(mar, aes(x = mean_temp)) +
+  geom_histogram(aes(y = ..density..),
+                 binwidth = 1,
+                 fill = "tomato",
+                 color = "black",
+                 alpha = .6) +
+  labs(x = "Temperatura", y = "Densidade") +
+  scale_x_continuous(limits = c(20, 35), 
+                     breaks = seq(20, 35, by = 5)) +
+  theme_minimal() -> h2
+
+# Plotando um abaixo do outro (o patchwork precisa estar carregado)
+h1 / h2
+
+# Teste de normalidade para a variável resposta
+shapiro.test(mar$mean_temp) # Não-normal
+ks.test(mar$mean_temp, "pnorm", mean(mar$mean_temp), sd(mar$mean_temp)) # Normal
+nortest::ad.test(mar$mean_temp) # Não-normal
+nortest::lillie.test(mar$mean_temp) # Não-normal
+tseries::jarque.bera.test(mar$mean_temp) # Não-normal
+
+
+# Dispersão da temperatura por umidade
 ggplot(mar, aes(x = mean_umid, y = mean_temp)) +
   geom_point(color = "cornflowerblue",
              size = 2,
@@ -29,103 +73,101 @@ ggplot(mar, aes(x = mean_umid, y = mean_temp)) +
               color = "tomato",
               se = FALSE) +
   labs(x = "Umidade", y = "Temperatura") +
-  theme_classic() +
   scale_y_continuous(limits = c(20, 35),
                      breaks = seq(20, 35, by = 5)) +
-  scale_x_continuous(limits = c(85, 100), 
-                     breaks = seq(85, 100, by = 5)) 
+  scale_x_continuous(limits = c(85, 100),
+                     breaks = seq(85, 100, by = 5)) +
+  theme_minimal() -> d1
+d1
 
-par(mfrow = c(2, 2))
+# Para plotar junto
+# par(mfrow = c(2, 2))
 
-# Gráfico de série temporal
+# Série temporal da temperatura média
 mt <- ggplot(mar, aes(x = DT_INTER, y = mean_temp)) +
   geom_line(color = "steelblue", size = .5) +
-  geom_point(color = "steelblue", size = 1) +
-  labs(title = "Série Temporal",
+  geom_point(color = "cornflowerblue", size = 1) +
+  labs(title = "Evolução da média da temperatura no tempo",
        x = "Data", 
-       y = "Valor") +
+       y = "Temperatura média") +
   scale_x_date(date_labels = "%b %Y",
                date_breaks = "1 month") +
   theme_minimal()
 
+# Série temporal da umidade média
 mu <- ggplot(mar, aes(x = DT_INTER, y = mean_umid)) +
   geom_line(color = "steelblue", size = .5) +
-  geom_point(color = "steelblue", size = 1) +
-  labs(title = "Série Temporal",
+  geom_point(color = "cornflowerblue", size = 1) +
+  labs(title = "Evolução da média da umidade no tempo",
        x = "Data", 
-       y = "Valor") +
+       y = "Umidade média") +
   scale_x_date(date_labels = "%b %Y",
                date_breaks = "1 month") +
   theme_minimal()
 
-library("patchwork")
-
+# Plotando um abaixo do outro (lembrar de carregar o patchwork)
 mt / mu
 
-#### Temperatura por umidade parece ter uma relação linear negativa e bem ajustada.
-#### Dentre todos gráficos que Amanda mandou, esse parece ser o mais interessante.
 
+# Correlação entre temperatura e umidade
+cor(x = mar$mean_temp, y = mar$mean_umid) # -0.8504322
+
+
+# Achados:
+
+# 1. Há uma correlação linear negativa da ordem de 85%, indicando que uma modelagem
+# linear entre essas duas variáveis é uma boa opção.
+# 2. Essa relação pode ser vista graficamente, tanto na bi-dispersão, quanto na
+# evolução temporal, onde se torna nítido o comportamento antagonista entre as
+# variáveis.
+# 3. O uso da mediana em vez da média não se mostrou interessante, pois ela não
+# gera dados contínuos, apesar de acusar mais normalidade que a média (considerando
+# o Shapiro-Wilk). A menos do teste de Kolmogorov-Smirnov, todos os outros
+# recusaram normalidade da temperatura média. Assim, torna-se útil e inteligente
+# utilizar o resultado do teste de K.S.
+
+
+
+# === Modelo linear simples ====
+
+# Modelagem
 x <- mar$mean_umid
 y <- mar$mean_temp
+
 modelo <- lm(y ~ x, data = mar)
 
+# Estatísticas e outras informações
 summary(modelo)
-# performance::check_model(modelo)
 
-(b0chap <- coef(modelo)[1])
-###B0 estimado = 159.8799
+# Diagnóstico visual
+performance::check_model(modelo) # Lembrar de aumentar a região de plotagem
 
-(b1chap <- coef(modelo)[2])
-###B1 estimado = -2.324915
+# Normalidade dos resíduos
+ks.test(modelo$residuals, "pnorm", mean(modelo$residuals), sd(modelo$residuals)) # Normal
 
-### calculando y_ajustado
-(y_ajustado <- predict(modelo, mar))
+# Independência dos resíduos
+lmtest::dwtest(modelo)
+
+# Homocedasticidade
+lmtest::bptest(modelo)
+
+# anova(modelo) # Já sai no summary do modelo
+
+# Coeficientes
+coefficients(modelo)
+confint.lm(modelo)
+
+# Valores ajustados
+ajustados <- modelo$fitted.values
+ajustados_IC <- predict(modelo, interval = "confidence") # Pegar colunas 2 e 3
+
+
+
+# Daqui pra baixo tem que avaliar a necessidade
 
 ### estimado sigma^2
 (sigma2chapeu <- summary(modelo)$sigma ^ 2)
-# ou
-(sum((mar$mean_umid - y_ajustado) ^ 2) / 363)
 
-### somatórios
-(sxy <- sum((x - mean(x)) * (y - mean(y))))
-(sxx <- sum((x - mean(x)) ^ 2))
-(syy <- sum((y - mean(y)) ^ 2))
-
-### IC de 95% de confiança para B0
-(ICb0 <- confint(modelo)[1, ])
-
-### IC de 95% de confiança para B0
-(ICb1 <- confint(modelo)[2, ])
-
-### IC para y_ajustado
-(ICy_i_c <-  predict(modelo, interval = "confidence"))
-(ICy_i_c[, 2:3])
-###### Teste de hipótese para B0
-(tb0 <- b0chap / sqrt(sigma2chapeu * (1 / length(x) + mean(x) ^ 2 / sxx)))
-### p-valor para B0
-#p0 <- 2*pt(-abs(tb0), df = summary(modelo)$df[1])
-(p01 <- 2 * (1 - pt(abs(tb0), df = summary(modelo)$df[2])))
-(p01 < 0.005)
-(t <- dt(0.975, 363))
-
-(tb0 > t)
-### Rejeita h0, logo há evidencias para acreditar que b0 é diferente de 0
-
-##### Teste de hipótese para B1
-(t_b1 <- b1chap / sqrt(sigma2chapeu / sxx))
-### p-valor para B1
-# p1 <- 2*pt(-abs(t_b1), df = summary(modelo)$df[1])
-(p12 <- 2 * (1 - pt(abs(t_b1), df = summary(modelo)$df[2])))
-(t <- dt(0.975, 363))
-
-abs(t_b1) > t
-
-(p12 < 0.005)
-#Em geral vamos usar o pvalor deste teste para tomar a decis˜ao. Ent˜ao H0 ser´a rejeitada
-#se o p-valor do teste for pequeno e aceita caso contr´ario
-### Pelo p-valor rejeita h0, mas pela estatistica de teste rejeita h0, logo há evidencias para acreditar que b0 é diferente de 0
-
-gama = 0.95
 
 # Intervalo de predicao para y_novo
 #usando uma funcao do R
@@ -164,16 +206,6 @@ abline(modelo, col = "red", lwd = 2)
 points(x, y)
 
 
-
-##### ANOVA
-
-(tabAnova <- anova(modelo))
-
-
-(residuos <-  y - modelo$fitted.values) #residuals(ajuste)
-(plot(round(residuos - modelo$residuals, 9)))
-
-
 hist(residuos,
      freq = F,
      main = "Histograma",
@@ -201,11 +233,3 @@ plot(y, residuos)
 plot(residuos)
 
 ### o grafico de y com os residos me pareceu estranho.
-
-# ==== Minha parte ====
-
-# install.packages("performance")
-
-# par(mfrow = c(3, 2))
-# windows11()
-# performance::check_model(modelo)
