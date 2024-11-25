@@ -65,22 +65,22 @@ modelo <- function(tipo = "max", dt_min, dt_max){
   
   #temperatura X umidade
  dispersao <- ggplot(mar, 
-         aes(x = temp, 
-             y = umid)) +
+         aes(y = temp, 
+             x = umid)) +
     geom_point(color="#1b6ca8", 
                size = 2, 
                alpha = .6) +
     geom_smooth(method = "lm",
                 color = "#3aaf85",
                 se = FALSE) +
-    labs(x = "Temperatura",
-         y = "Umidade") +
+    labs(y = "Temperatura",
+         x = "Umidade") +
     theme_classic()
  
 
  
- y <- mar$umid
- x <- mar$temp
+ y <- mar$temp
+ x <- mar$umid
  n <- length(y)
  modelo <- lm(y ~ x, data = mar)
  
@@ -204,7 +204,7 @@ gg_hist_residuos <-  ggplot(data = data.frame(x = residuos), aes(x)) +
 }
 
 
-model <- modelo(dt_min = "2018-01-01", dt_max = "2018-12-31")
+model <- modelo(dt_min = "2018-01-01", dt_max = "2018-12-31", tipo = "media")
 
 
 model$gg_dispersao
